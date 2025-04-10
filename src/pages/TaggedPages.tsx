@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
 import { Plus, Folder, X, Edit2, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 interface Folder {
@@ -26,43 +26,54 @@ export function TaggedPages() {
   }, [user]);
 
   const fetchFolders = async () => {
+    if (!user) return;
+    
     try {
       const { data, error } = await supabase
         .from('folders')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setFolders(data || []);
     } catch (error) {
-      toast.error('Error fetching folders');
+      console.error('Error fetching folders:', error);
+      toast.error('Failed to load folders');
     }
   };
 
   const handleCreateFolder = async () => {
+    if (!user) return;
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('folders')
         .insert([
           {
+            user_id: user.id,
             name: newFolder.name,
             description: newFolder.description,
-            user_id: user?.id,
-          },
-        ]);
+          }
+        ])
+        .select()
+        .single();
 
       if (error) throw error;
 
+      setFolders([data, ...folders]);
       setIsCreating(false);
       setNewFolder({ name: '', description: '' });
-      fetchFolders();
       toast.success('Folder created successfully');
     } catch (error) {
-      toast.error('Error creating folder');
+      console.error('Error creating folder:', error);
+      toast.error('Failed to create folder');
     }
   };
 
   const handleUpdateFolder = async (id: string) => {
+    if (!user) return;
+
     try {
       const folderToUpdate = folders.find(f => f.id === id);
       if (!folderToUpdate) return;
@@ -80,11 +91,14 @@ export function TaggedPages() {
       setEditingFolder(null);
       toast.success('Folder updated successfully');
     } catch (error) {
-      toast.error('Error updating folder');
+      console.error('Error updating folder:', error);
+      toast.error('Failed to update folder');
     }
   };
 
   const handleDeleteFolder = async (id: string) => {
+    if (!user) return;
+
     try {
       const { error } = await supabase
         .from('folders')
@@ -96,7 +110,8 @@ export function TaggedPages() {
       setFolders(folders.filter(f => f.id !== id));
       toast.success('Folder deleted successfully');
     } catch (error) {
-      toast.error('Error deleting folder');
+      console.error('Error deleting folder:', error);
+      toast.error('Failed to delete folder');
     }
   };
 

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { createProfile } from '../lib/database';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {
@@ -62,37 +63,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error: signUpError, data } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            full_name: userData.name,
-          },
-        },
       });
 
       if (signUpError) throw signUpError;
 
       if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              user_id: data.user.id,
-              name: userData.name,
-              email: data.user.email,
-              dob: userData.dob || null,
-              currently_pursuing: userData.currentlyPursuing,
-              interests: userData.interests,
-              phone: userData.phone,
-            },
-          ]);
-
-        if (profileError) {
+        try {
+          await createProfile(data.user.id, {
+            name: userData.name,
+            dob: userData.dob || null,
+            currently_pursuing: userData.currentlyPursuing,
+            interests: userData.interests,
+            phone: userData.phone,
+          });
+          toast.success('Account created successfully');
+        } catch (profileError) {
           console.error('Error creating profile:', profileError);
           toast.error('Failed to create user profile');
           throw profileError;
         }
-
-        toast.success('Account created successfully');
       }
     } catch (error) {
       console.error('Sign up error:', error);
@@ -120,7 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       setUser(null);
       toast.success('Signed out successfully');
     } catch (error) {

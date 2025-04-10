@@ -16,6 +16,14 @@ interface Profile {
   interests: string[];
 }
 
+const defaultProfile: Omit<Profile, 'id'> = {
+  name: '',
+  phone: '',
+  dob: null,
+  currently_pursuing: '',
+  interests: [],
+};
+
 export function Settings() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -29,6 +37,30 @@ export function Settings() {
     }
   }, [user]);
 
+  const createProfile = async () => {
+    if (!user) return null;
+
+    try {
+      const newProfile = {
+        user_id: user.id,
+        ...defaultProfile
+      };
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([newProfile])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error creating profile:', error);
+      toast.error('Failed to create profile');
+      return null;
+    }
+  };
+
   const fetchProfile = async () => {
     if (!user) return;
 
@@ -38,10 +70,21 @@ export function Settings() {
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      setProfile(data);
+
+      if (!data) {
+        // No profile found, create a new one
+        const newProfile = await createProfile();
+        if (newProfile) {
+          setProfile(newProfile);
+          setIsEditing(true); // Automatically enable editing for new profiles
+          toast.success('New profile created! Please fill in your details.');
+        }
+      } else {
+        setProfile(data);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
       toast.error('Failed to load profile');
